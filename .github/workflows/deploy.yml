@@ -1,12 +1,20 @@
+# .github/workflows/deploy.yml
+
 name: Deploy Next.js to GitHub Pages
 
 on:
   # Roda quando um push é feito na branch 'main'
   push:
-    branches: [main]
-  
+    branches: [main] # <-- Mude para 'master' se sua branch principal for 'master'
+
   # Permite que você rode este workflow manualmente pela aba Actions do GitHub
   workflow_dispatch:
+
+# Permissões para a Action poder escrever na branch gh-pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   build-and-deploy:
@@ -19,25 +27,36 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
+          cache: 'npm'
+          # Adicionado cache para acelerar instalações futuras
+          cache-dependency-path: my-app/package-lock.json
 
       - name: Install Dependencies 📦
-        run: npm ci
+        # IMPORTANTE: Roda os comandos DENTRO da pasta 'my-app'
+        working-directory: ./my-app
+        run: npm ci # 'ci' usa o package-lock.json
 
       - name: Build 🏗️
-        # Roda o comando de build do Next.js
+        # IMPORTANTE: Roda os comandos DENTRO da pasta 'my-app'
+        working-directory: ./my-app
         run: npm run build
-        # Define a variável de ambiente para que o next.config.mjs use o 'basePath'
         env:
+          # Garante que o next.config.mjs use as configurações de produção
           NODE_ENV: production
 
       - name: Add .nojekyll file
-        # Cria um arquivo .nojekyll para evitar problemas com o Jekyll do GitHub Pages
-        run: touch ./out/.nojekyll
-      
-      - name: Deploy to GitHub Pages 🚀
-        # Action popular que faz o deploy na branch gh-pages
-        uses: peaceiris/actions-gh-pages@v4
+        # Cria o arquivo na pasta de saída correta
+        run: touch ./my-app/out/.nojekyll
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          # O diretório que será publicado (o resultado do build)
-          publish_dir: ./out
+          # IMPORTANTE: Aponta para a pasta de saída correta DENTRO de 'my-app'
+          path: ./my-app/out
+
+      - name: Deploy to GitHub Pages 🚀
+        id: deployment
+        uses: actions/deploy-pages@v4
